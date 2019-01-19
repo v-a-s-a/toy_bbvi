@@ -24,4 +24,4 @@ Libs:
 
 ## GPU support
 
-Distributions.jl also may not play nicely with GPUs! See: 
+Distributions.jl also may not play nicely with GPUs!
