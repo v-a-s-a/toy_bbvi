@@ -1,6 +1,6 @@
 
 using Distributions
-using Flux.Tracker
+using Flux.Tracker, Flux.Optimise
 using Plots
 
 function log_density(params)
@@ -35,20 +35,39 @@ function gaussian_entropy(log_std)
     return H
 end
 
-function variational_objective(mu, log_std, log_density; D)
-    samples = rand(Normal(), D, num_samples) .* sqrt.(log_std) .+ mu
-    log_px = mapslices(log_density, samples; dims=1) # eval log(target) for all samples of params (i.e. cols)
+function variational_objective(mu, log_std; D=2)
+    samples = rand(Normal(), num_samples, D) .* sqrt.(log_std) .+ mu
+    log_px = mapslices(log_density, samples; dims=2) # eval log(target) for all samples of params (i.e. cols)
     evidence_lower_bound = gaussian_entropy(log_std) + mean(log_px)
     return -evidence_lower_bound
 end
 
-Mu = param(reshape([-1, -1], :, 1))
-Log_std = param(reshape([5, 5], :, 1))
+mu = param(reshape([-1, -1], 1, :))
+sigma = param(reshape([5, 5], 1, :))
 
-mu = reshape([-1, -1], :, 1)
-sigma = reshape([5, 5], :, 1)
+elbo = []
 
-test_elbo = variational_objective(mu, sigma; D=2)
+push!(elbo, variational_objective(mu, sigma))
+elbo_gradient = Tracker.gradient(variational_objective, mu, sigma)
 
-elbo = variational_objective(Mu, Log_std)
-elbo_gradient = Tracker.gradient(variational_objective, Mu, Log_std)[1]
+Tracker.update!(mu, -0.0001 * elbo_gradient[1])
+Tracker.update!(sigma, -0.0001 * elbo_gradient[1])
+
+push!(elbo, variational_objective(mu, sigma))
+
+Tracker.update!(mu, -0.0001 * elbo_gradient[1])
+Tracker.update!(sigma, -0.0001 * elbo_gradient[1])
+
+push!(elbo, variational_objective(mu, sigma))
+
+Tracker.update!(mu, -0.0001 * elbo_gradient[1])
+Tracker.update!(sigma, -0.0001 * elbo_gradient[1])
+
+push!(elbo, variational_objective(mu, sigma))
+
+Tracker.update!(mu, -0.0001 * elbo_gradient[1])
+Tracker.update!(sigma, -0.0001 * elbo_gradient[1])
+
+push!(elbo, variational_objective(mu, sigma))
+
+println(elbo)
