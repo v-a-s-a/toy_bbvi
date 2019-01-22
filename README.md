@@ -3,10 +3,16 @@ Automatic Differentiation Variational Inference in Julia
 
 ## Roadmap
 
-try to recreate the following:
-https://github.com/HIPS/autograd/blob/master/examples/black_box_svi.py
+Recreating "Black-Box Stochastic Variational Inference in Five Lines of Python"
+See: https://github.com/HIPS/autograd/blob/master/examples/black_box_svi.py
 
-GPU support
+Creating the toy example. A small gif of maximizing the evidence lower-bound.
+
+Move onto a data based problem. Maybe linear/logistic regression or a bayesnet.
+
+Batched inference and stochastic variational inference.
+
+GPU support.
 
 ## Automatic Differentiation
 
