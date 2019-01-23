@@ -1,6 +1,6 @@
 
 using Distributions
-using Flux.Tracker: gradient, param
+using Flux.Tracker: gradient, param, Params
 using Flux.Optimise: Descent, ADAM, update!
 using Plots
 using LinearAlgebra
@@ -30,7 +30,7 @@ for i in 1:size(X)[1]
     end
 end
 
-plot(contour(x, y, Z))
+#plot(contour(x, y, Z))
 
 D = 2  # dimensions of approximate posterior
 num_samples = 100
@@ -52,19 +52,22 @@ end
 mu = param(reshape([-1, -1], 1, :))
 sigma = param(reshape([5, 5], 1, :))
 
-parameters = [mu, sigma]
-elbo_gradient = gradient(variational_objective, mu, sigma)
+elbo_gradient = gradient(() -> variational_objective(mu, sigma), Params([mu, sigma]))
+
+opt = Descent(0.001)
+for p in (mu, sigma)
+    update!(opt, p, elbo_gradient[p])
+end
 
 elbo = [variational_objective(mu, sigma)]
 steps = 100
 
 η = 0.001
-opt = ADAM(0.001)
+opt = Descent(0.001)
 for i in 1:steps
     println(i)
-    for p in 1:length(parameters)
-        update!(opt, parameters[p], -η .* elbo_gradient[p].data)
-        push!(elbo, variational_objective(mu, sigma))
+    for p in (mu, sigma)
+        Flux.Optimise.update!(opt, p, elbo_gradient[p].data)
     end
 end
 
