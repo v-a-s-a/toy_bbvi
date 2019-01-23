@@ -1,7 +1,6 @@
 
 using Distributions
-using Flux.Tracker: gradient, param
-using Flux.Optimise: Descent, ADAM, update!
+using Flux
 using Plots
 using LinearAlgebra
 
@@ -26,7 +25,7 @@ Y = repeat(y, 1, length(x))
 Z = Array{Float64}(undef, size(X))
 for i in 1:size(X)[1]
     for j in 1:size(X)[2]
-        Z[i, j] = exp(log_density([X[i,j], Y[i, j]]))
+        Z[i, j] = exp(log_density([X[i, j], Y[i, j]]))
     end
 end
 
@@ -42,29 +41,29 @@ function gaussian_entropy(log_std)
     return H
 end
 
-function variational_objective(mu, log_std; D=2)
+function variational_objective(parameters; D=2)
+    mu, log_std = parameters
     samples = rand(Normal(), num_samples, D) .* sqrt.(log_std) .+ mu
     log_px = mapslices(log_density, samples; dims=2) # eval log(target) for all samples of params (i.e. cols)
     elbo = gaussian_entropy(log_std) + mean(log_px)
     return -elbo
 end
 
-mu = param(reshape([-1, -1], 1, :))
-sigma = param(reshape([5, 5], 1, :))
+mu = Flux.Tracker.param(reshape([-1, -1], 1, :))
+sigma = Flux.Tracker.param(reshape([1, 1], 1, :))
 
-parameters = [mu, sigma]
-elbo_gradient = gradient(variational_objective, mu, sigma)
+parameters = Flux.Tracker.Params([mu, sigma])
+elbo_gradient = Flux.Tracker.gradient(() -> variational_objective(parameters), parameters)
 
-elbo = [variational_objective(mu, sigma)]
-steps = 100
+elbo = [variational_objective(parameters)]
+steps = 1000
 
-η = 0.001
-opt = ADAM(0.001)
+opt = ADAM(0.01)
 for i in 1:steps
     println(i)
-    for p in 1:length(parameters)
-        update!(opt, parameters[p], -η .* elbo_gradient[p].data)
-        push!(elbo, variational_objective(mu, sigma))
+    for p in (mu, sigma)
+        Flux.Tracker.update!(p, Flux.Optimise.update!(opt, p, Flux.data(elbo_gradient[p])))
+        push!(elbo, variational_objective(parameters))
     end
 end
 
@@ -72,7 +71,7 @@ q = MultivariateNormal(mu[1,:].data, Diagonal(exp.(2*sigma[1,:].data)))
 Z_q = Array{Float64}(undef, size(X))
 for i in 1:size(X)[1]
     for j in 1:size(X)[2]
-        Z[i, j] = pdf(q, [X[i,j], Y[i, j]])
+        Z[i, j] = pdf(q, [X[i, j], Y[i, j]])
     end
 end
 
