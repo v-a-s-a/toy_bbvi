@@ -33,8 +33,6 @@ function variational_objective(parameters; D=2)
     mu, log_std = parameters
     samples = rand(Normal(), num_samples, D) .* exp.(log_std) .+ mu
     log_px = mapslices(log_density, samples; dims=2) # eval log(target) for all samples of params (i.e. cols)
-    # println("entropy: $(gaussian_entropy(log_std))")
-    # println("mean: $(mean(log_px))")
     elbo = gaussian_entropy(log_std) + mean(log_px)
     return -elbo
 end
@@ -45,22 +43,12 @@ sigma = Flux.Tracker.param(reshape([-5, -5], 1, :))
 parameters = Flux.Tracker.Params([mu, sigma])
 elbo_gradient = Flux.Tracker.gradient(() -> variational_objective(parameters), parameters)
 
-elbo = [variational_objective(parameters)]
 steps = 200
+elbo = Array{Float32}(undef, steps)
+elbo[1] = variational_objective([mu.data, sigma.data])
 
-opt = ADAM(0.1)
-for i in 1:steps
-    println(i)
-    elbo_gradient = Flux.Tracker.gradient(() -> variational_objective(parameters), parameters)
-    for p in (mu, sigma)
-        Δ =  Flux.Optimise.update!(opt, p, Flux.data(elbo_gradient[p]))
-        Flux.Tracker.update!(p, -Δ)
-        push!(elbo, variational_objective(parameters))
-    end
-end
 
-## Plotting
-
+### Plotting
 x = -2:0.1:2
 y = -4:0.1:2
 
@@ -74,7 +62,6 @@ for i in 1:size(X)[1]
     end
 end
 
-
 q = MultivariateNormal(mu[1,:].data, Diagonal(exp.(2*sigma[1,:].data)))
 Z_q = Array{Float64}(undef, size(X))
 for i in 1:size(X)[1]
@@ -83,5 +70,30 @@ for i in 1:size(X)[1]
     end
 end
 
-contour(x, y, Z)
-contour!(x, y, Z_q)
+Z_q_trajectory = Array{Float32}(undef, steps, size(X)[1], size(X)[2])
+
+opt = ADAM(0.1)
+for step in 1:steps
+    println(step)
+    elbo_gradient = Flux.Tracker.gradient(() -> variational_objective(parameters), parameters)
+    for p in (mu, sigma)
+        Δ =  Flux.Optimise.update!(opt, p, Flux.data(elbo_gradient[p]))
+        Flux.Tracker.update!(p, -Δ)
+        elbo[step] = variational_objective([mu.data, sigma.data])
+
+        q = MultivariateNormal(mu[1,:].data, Diagonal(exp.(2*sigma[1,:].data)))
+        for i in 1:size(X)[1]
+            for j in 1:size(X)[2]
+                Z_q_trajectory[step, i, j] = pdf(q, [X[i, j], Y[i, j]])
+            end
+        end
+
+    end
+end
+
+# Plotting
+anim = @animate for i=1:steps
+    plot(contour(x, y, Z))
+    contour!(x, y, Z_q_trajectory[i, :, :])
+end
+gif(anim, "mygif.gif", fps = 1)
